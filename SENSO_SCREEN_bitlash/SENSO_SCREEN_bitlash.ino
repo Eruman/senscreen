@@ -95,11 +95,14 @@ uint16_t buttons_y = 0;
 #include "bitlash.h"
 
 /*
-#define MORSE_BUF_LEN 80
-byte morse_buffer_tail;
-byte morse_buffer_head;
-byte morse_buffer[MORSE_BUF_LEN];
+  #define MORSE_BUF_LEN 80
+  byte morse_buffer_tail;
+  byte morse_buffer_head;
+  byte morse_buffer[MORSE_BUF_LEN];
 */
+
+long pos = 0;
+boolean need_export = 0;
 
 // function handler for "tone()" bitlash function
 //
@@ -193,20 +196,49 @@ numvar func_translator() {
   }
 }
 
+numvar func_export() {
+  if (getarg(0) == 1 && getarg(1) != 0) {
+    need_export = true;
+  } else if (getarg(0) == 1 && getarg(1) == 0) {
+    need_export = false;
+  } else {
+    return need_export;  
+  }
+  return 0;
+}
+
+void view_export() {
+  if (millis()%100!=0 || need_export == false) return;
+    Serial.print(getVar('x' - 'a'));
+    Serial.print(',');
+    Serial.print(getVar('y' - 'a'));
+    Serial.print(',');
+    Serial.print(getVar('z' - 'a'));
+    Serial.print(',');
+    Serial.print(getVar('w' - 'a'));
+    Serial.print(',');
+    Serial.print(getVar('v' - 'a'));
+    Serial.print(',');
+    Serial.print(digitalRead(13));
+    Serial.println();
+}
+
 
 void setup(void) {
   initBitlash(115200);    // must be first to initialize serial port
-  addBitlashFunction("tone", (bitlash_function) func_tone);
-  addBitlashFunction("notone", (bitlash_function) func_notone);
-  addBitlashFunction("printd", (bitlash_function) func_printd);
-  addBitlashFunction("printm", (bitlash_function) func_printm);
+  addBitlashFunction("tone",     (bitlash_function) func_tone);
+  addBitlashFunction("notone",   (bitlash_function) func_notone);
+  addBitlashFunction("printd",   (bitlash_function) func_printd);
+  addBitlashFunction("printm",   (bitlash_function) func_printm);
   addBitlashFunction("printmln", (bitlash_function) func_printmln);
   addBitlashFunction("setcursor", (bitlash_function) func_tft_setCursor);
   addBitlashFunction("textsize", (bitlash_function) func_tft_setTextSize);
   addBitlashFunction("settextcolor", (bitlash_function) func_tft_setTextColor);
-  addBitlashFunction("cls", (bitlash_function) func_tft_fillScreen);
+  addBitlashFunction("cls",      (bitlash_function) func_tft_fillScreen);
   addBitlashFunction("fillrect", (bitlash_function) func_tft_fillRect);
-  addBitlashFunction("trans", (bitlash_function) func_translator);
+  addBitlashFunction("trans",    (bitlash_function) func_translator);
+  addBitlashFunction("resenc",   (bitlash_function) func_resenc);
+  addBitlashFunction("export",   (bitlash_function) func_export);
 
   // Inicialize the controller
   tft.reset();
@@ -233,6 +265,8 @@ void setup(void) {
   // Calibration
   showCalibration();
 
+  tft.fillScreen(0);
+  pinMode(13, INPUT_PULLUP);
 }
 
 // -- Loop
@@ -242,9 +276,9 @@ void loop()
   TSPoint p;
 
   // Wait a touch
-  digitalWrite(13, HIGH);
+  //digitalWrite(13, HIGH);
   p = waitOneTouch();
-  digitalWrite(13, LOW);
+  //digitalWrite(13, LOW);
 
   // Map of values
   //  p.x = map(p.x, TS_MINX, TS_MAXX, 0, tft.width());
@@ -272,9 +306,12 @@ TSPoint waitOneTouch() {
     pinMode(XM, OUTPUT); //Pins configures again for TFT control
     pinMode(YP, OUTPUT);
     runBitlash();
+    encoder_loop();
+    view_export();
   } while ((p.z < MINPRESSURE ) || (p.z > MAXPRESSURE)) ;
-  assignVar('X'-'A', mapXValue(p));  
-  assignVar('Y'-'A', mapYValue(p));  
+  assignVar('X' - 'A', mapXValue(p));
+  assignVar('Y' - 'A', mapYValue(p));
+  assignVar('Z' - 'A', p.z);
   return p;
 }
 
